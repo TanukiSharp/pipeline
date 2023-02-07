@@ -1,32 +1,37 @@
 package pipeline
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-type MergeSubject[T any] struct {
-	done     <-chan struct{}
-	subjects []Subject[T]
+type MergeSubject[TInput any, TOutput any] struct {
+	ctx      context.Context
+	subjects []Subject[TInput, TOutput]
 }
 
-func NewMergeSubjectWithFactory[T any](pipeline *Pipeline[T], howMany int, factoryFunc func() Subject[T]) *MergeSubject[T] {
-	if pipeline == nil {
-		panic("argument 'pipeline' is mandatory")
+var _ Subject[any, any] = &MergeSubject[any, any]{}
+
+func NewMergeSubjectWithFactory[TInput any, TOutput any](ctx context.Context, howMany int, factoryFunc func(i int) Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
+	if ctx == nil {
+		panic("argument 'ctx' is mandatory")
 	}
 	if factoryFunc == nil {
 		panic("argument 'factoryFunc' is mandatory")
 	}
 
-	subjects := make([]Subject[T], howMany)
+	subjects := make([]Subject[TInput, TOutput], howMany)
 
 	for i := 0; i < howMany; i++ {
-		subjects[i] = factoryFunc()
+		subjects[i] = factoryFunc(i)
 	}
 
-	return NewMergeSubjectWithInstances(pipeline, subjects...)
+	return NewMergeSubjectWithInstances(ctx, subjects...)
 }
 
-func NewMergeSubjectWithInstances[T any](pipeline *Pipeline[T], subjects ...Subject[T]) *MergeSubject[T] {
-	if pipeline == nil {
-		panic("argument 'pipeline' is mandatory")
+func NewMergeSubjectWithInstances[TInput any, TOutput any](ctx context.Context, subjects ...Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
+	if ctx == nil {
+		panic("argument 'ctx' is mandatory")
 	}
 	if subjects == nil {
 		panic("argument 'subject' is mandatory")
@@ -35,32 +40,41 @@ func NewMergeSubjectWithInstances[T any](pipeline *Pipeline[T], subjects ...Subj
 		panic("argument 'subjects' must contain at least one element")
 	}
 
-	return &MergeSubject[T]{
-		done:     pipeline.GetDone(),
+	return &MergeSubject[TInput, TOutput]{
+		ctx:      ctx,
 		subjects: subjects,
 	}
 }
 
-func (c *MergeSubject[T]) Consume(input <-chan T) {
+func (c *MergeSubject[TInput, TOutput]) Consume(input <-chan TInput) func() {
 	if input == nil {
 		panic("argument 'input' is mandatory")
 	}
 
+	unregisterFuncs := []func(){}
+
 	for _, c := range c.subjects {
-		c.Consume(input)
+		unregisterFunc := c.Consume(input)
+		unregisterFuncs = append(unregisterFuncs, unregisterFunc)
+	}
+
+	return func() {
+		for _, unregisterFunc := range unregisterFuncs {
+			unregisterFunc()
+		}
 	}
 }
 
-func (s *MergeSubject[T]) Produce() <-chan T {
+func (s *MergeSubject[TInput, TOutput]) Produce() <-chan TOutput {
 	var wg sync.WaitGroup
-	output := make(chan T)
+	output := make(chan TOutput)
 
-	outputFunc := func(c <-chan T) {
+	outputFunc := func(c <-chan TOutput) {
 		defer wg.Done()
 		for n := range c {
 			select {
 			case output <- n:
-			case <-s.done:
+			case <-s.ctx.Done():
 				return
 			}
 		}
@@ -78,4 +92,8 @@ func (s *MergeSubject[T]) Produce() <-chan T {
 	}()
 
 	return output
+}
+
+func (s *MergeSubject[TInput, TOutput]) LinkTo(consumer Consumer[TOutput]) func() {
+	return consumer.Consume(s.Produce())
 }

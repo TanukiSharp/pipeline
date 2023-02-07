@@ -1,20 +1,24 @@
 package pipeline
 
+import "context"
+
 type DelegateProducer[T any] struct {
-	done        <-chan struct{}
+	ctx         context.Context
 	factoryFunc func() (T, bool)
 }
 
-func NewDelegateProducer[T any](pipeline *Pipeline[T], factoryFunc func() (T, bool)) *DelegateProducer[T] {
-	if pipeline == nil {
-		panic("argument 'pipeline' is mandatory")
+var _ Producer[any] = &DelegateProducer[any]{}
+
+func NewDelegateProducer[T any](ctx context.Context, factoryFunc func() (T, bool)) *DelegateProducer[T] {
+	if ctx == nil {
+		panic("argument 'ctx' is mandatory")
 	}
 	if factoryFunc == nil {
 		panic("argument 'factoryFunc' is mandatory")
 	}
 
 	return &DelegateProducer[T]{
-		done:        pipeline.GetDone(),
+		ctx:         ctx,
 		factoryFunc: factoryFunc,
 	}
 }
@@ -31,11 +35,15 @@ func (p *DelegateProducer[T]) Produce() <-chan T {
 			}
 			select {
 			case output <- item:
-			case <-p.done:
+			case <-p.ctx.Done():
 				return
 			}
 		}
 	}()
 
 	return output
+}
+
+func (p *DelegateProducer[T]) LinkTo(consumer Consumer[T]) func() {
+	return consumer.Consume(p.Produce())
 }

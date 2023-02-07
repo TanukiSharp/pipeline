@@ -1,14 +1,15 @@
 package pipeline
 
-type Producer[T any] interface {
-	Produce() <-chan T
+type Producer[TOutput any] interface {
+	Produce() <-chan TOutput
+	LinkTo(consumer Consumer[TOutput]) func()
 }
 
-type Consumer[T any] interface {
-	Consume(<-chan T)
+type Consumer[TInput any] interface {
+	Consume(<-chan TInput) func()
 }
 
-type Subject[T any] interface {
-	Producer[T]
-	Consumer[T]
+type Subject[TInput any, TOutput any] interface {
+	Consumer[TInput]
+	Producer[TOutput]
 }

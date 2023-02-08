@@ -3,6 +3,7 @@ package pipeline
 import "context"
 
 type DelegateProducer[T any] struct {
+	name        string
 	ctx         context.Context
 	factoryFunc func() (T, bool)
 }
@@ -23,19 +24,28 @@ func NewDelegateProducer[T any](ctx context.Context, factoryFunc func() (T, bool
 	}
 }
 
-func (p *DelegateProducer[T]) Produce() <-chan T {
+func (block *DelegateProducer[T]) GetName() string {
+	return block.name
+}
+
+func (block *DelegateProducer[T]) SetName(name string) *DelegateProducer[T] {
+	block.name = name
+	return block
+}
+
+func (block *DelegateProducer[T]) Produce() <-chan T {
 	output := make(chan T)
 
 	go func() {
 		defer close(output)
 		for {
-			item, hasItem := p.factoryFunc()
+			item, hasItem := block.factoryFunc()
 			if hasItem == false {
 				break
 			}
 			select {
 			case output <- item:
-			case <-p.ctx.Done():
+			case <-block.ctx.Done():
 				return
 			}
 		}
@@ -44,6 +54,6 @@ func (p *DelegateProducer[T]) Produce() <-chan T {
 	return output
 }
 
-func (p *DelegateProducer[T]) LinkTo(consumer Consumer[T]) func() {
-	return consumer.Consume(p.Produce())
+func (block *DelegateProducer[T]) LinkTo(consumer Consumer[T]) UnlinkFunc {
+	return consumer.Consume(block.Produce())
 }

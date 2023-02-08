@@ -9,26 +9,37 @@ import (
 // ================================================================================
 
 func sample1() {
+	fmt.Printf("[sample1] begin\n")
+	defer fmt.Printf("[sample1] end\n")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	source := pipeline.NewItemsProducer(ctx, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+	fmt.Printf("[sample1] create blocks begin\n")
+
+	source := pipeline.NewItemsProducer(ctx, []int{0, 1, 2, 3, 4, 5}).SetName("source")
 	subject1 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		return input * input
-	})
+	}).SetName("subject1")
 	subject2 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		return input + 0
-	})
+	}).SetName("subject2")
 	subject3 := pipeline.NewDelegateSubject(ctx, func(input int) any {
 		fmt.Println(input)
 		return nil
-	})
-	sink := pipeline.NewDrainConsumer[any]()
+	}).SetName("subject3")
+	sink := pipeline.NewDrainConsumer[any]().SetName("sink")
+
+	fmt.Printf("[sample1] create blocks end\n")
+
+	fmt.Printf("[sample1] link blocks begin\n")
 
 	source.LinkTo(subject1)
 	subject1.LinkTo(subject2)
 	subject2.LinkTo(subject3)
 	subject3.LinkTo(sink)
+
+	fmt.Printf("[sample1] link blocks end\n")
 
 	// TODO: Something to do here :/
 }
@@ -37,20 +48,20 @@ func sample2() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	source := pipeline.NewItemsProducer(ctx, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+	source := pipeline.NewItemsProducer(ctx, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}).SetName("source")
 	subject1 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		return input * input
-	})
+	}).SetName("subject1")
 	subject2 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		if input > 25 {
 			cancel()
 		}
 		return input + 0
-	})
+	}).SetName("subject2")
 	sink := pipeline.NewDelegateConsumer(func(input int) bool {
 		fmt.Println(input)
 		return true
-	})
+	}).SetName("sink")
 
 	source.LinkTo(subject1)
 	subject1.LinkTo(subject2)
@@ -63,17 +74,17 @@ func sample3() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	source := pipeline.NewItemsProducer(ctx, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+	source := pipeline.NewItemsProducer(ctx, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}).SetName("source")
 	subject1 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		return input * input
-	})
+	}).SetName("subject1")
 	subject2 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		return input + 0
-	})
+	}).SetName("subject2")
 	sink := pipeline.NewDelegateConsumer(func(input int) bool {
 		fmt.Println(input)
 		return input < 25
-	})
+	}).SetName("sink")
 
 	source.LinkTo(subject1)
 	subject1.LinkTo(subject2)
@@ -91,20 +102,20 @@ func sample4() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	source := pipeline.NewItemsProducer(ctx, []int{4, 9})
+	source := pipeline.NewItemsProducer(ctx, []int{4, 9}).SetName("source")
 
 	subject1 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		return input * input
-	})
+	}).SetName("subject1")
 	subject2 := pipeline.NewDelegateSubject(ctx, func(input int) int {
 		return input * input
-	})
-	merge := pipeline.NewMergeSubjectWithInstances[int, int](ctx, subject1, subject2)
+	}).SetName("subject2")
+	merge := pipeline.NewMergeSubjectWithInstances[int, int](ctx, subject1, subject2).SetName("merge")
 
 	sink := pipeline.NewDelegateConsumer(func(input int) bool {
 		fmt.Println(input)
 		return true
-	})
+	}).SetName("sink")
 
 	source.LinkTo(merge)
 	merge.LinkTo(sink)
@@ -121,7 +132,7 @@ func runSample(name string, f func()) {
 
 func main() {
 	runSample("sample1", sample1)
-	runSample("sample2", sample2)
-	runSample("sample3", sample3)
-	runSample("sample4", sample4)
+	// runSample("sample2", sample2)
+	// runSample("sample3", sample3)
+	// runSample("sample4", sample4)
 }

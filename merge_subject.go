@@ -6,6 +6,7 @@ import (
 )
 
 type MergeSubject[TInput any, TOutput any] struct {
+	name     string
 	ctx      context.Context
 	subjects []Subject[TInput, TOutput]
 }
@@ -46,7 +47,16 @@ func NewMergeSubjectWithInstances[TInput any, TOutput any](ctx context.Context, 
 	}
 }
 
-func (c *MergeSubject[TInput, TOutput]) Consume(input <-chan TInput) func() {
+func (c *MergeSubject[TInput, TOutput]) GetName() string {
+	return c.name
+}
+
+func (c *MergeSubject[TInput, TOutput]) SetName(name string) *MergeSubject[TInput, TOutput] {
+	c.name = name
+	return c
+}
+
+func (c *MergeSubject[TInput, TOutput]) Consume(input <-chan TInput) UnlinkFunc {
 	if input == nil {
 		panic("argument 'input' is mandatory")
 	}
@@ -94,6 +104,6 @@ func (s *MergeSubject[TInput, TOutput]) Produce() <-chan TOutput {
 	return output
 }
 
-func (s *MergeSubject[TInput, TOutput]) LinkTo(consumer Consumer[TOutput]) func() {
+func (s *MergeSubject[TInput, TOutput]) LinkTo(consumer Consumer[TOutput]) UnlinkFunc {
 	return consumer.Consume(s.Produce())
 }

@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-func TestRegularDelegateConsumer(t *testing.T) {
+func TestRegularDelegateTargetBlock(t *testing.T) {
 	obtained := 0
 
-	consumer := NewDelegateConsumer(func(input int) bool {
+	target := NewDelegateTargetBlock(func(input int) bool {
 		obtained += input
 		return true
 	})
@@ -21,7 +21,7 @@ func TestRegularDelegateConsumer(t *testing.T) {
 		ch <- 3
 	}()
 
-	consumer.Consume(ch)
+	target.Consume(ch)
 
 	const expected = 6
 
@@ -30,10 +30,10 @@ func TestRegularDelegateConsumer(t *testing.T) {
 	}
 }
 
-func TestInterruptedDelegateConsumer(t *testing.T) {
+func TestInterruptedDelegateTargetBlock(t *testing.T) {
 	obtained := 0
 
-	consumer := NewDelegateConsumer(func(input int) bool {
+	target := NewDelegateTargetBlock(func(input int) bool {
 		if input > 4 {
 			return false
 		}
@@ -55,7 +55,7 @@ func TestInterruptedDelegateConsumer(t *testing.T) {
 		ch <- 8
 	}()
 
-	consumer.Consume(ch)
+	target.Consume(ch)
 
 	const expected = 10
 

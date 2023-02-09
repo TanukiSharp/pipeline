@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type MergeSubject[TInput any, TOutput any] struct {
+type MergeSubject[TInput, TOutput any] struct {
 	name     string
 	ctx      context.Context
 	subjects []Subject[TInput, TOutput]
@@ -13,7 +13,7 @@ type MergeSubject[TInput any, TOutput any] struct {
 
 var _ Subject[any, any] = &MergeSubject[any, any]{}
 
-func NewMergeSubjectWithFactory[TInput any, TOutput any](ctx context.Context, howMany int, factoryFunc func(i int) Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
+func NewMergeSubjectWithFactory[TInput, TOutput any](ctx context.Context, howMany int, factoryFunc func(i int) Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
 	if ctx == nil {
 		panic("argument 'ctx' is mandatory")
 	}
@@ -30,7 +30,7 @@ func NewMergeSubjectWithFactory[TInput any, TOutput any](ctx context.Context, ho
 	return NewMergeSubjectWithInstances(ctx, subjects...)
 }
 
-func NewMergeSubjectWithInstances[TInput any, TOutput any](ctx context.Context, subjects ...Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
+func NewMergeSubjectWithInstances[TInput, TOutput any](ctx context.Context, subjects ...Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
 	if ctx == nil {
 		panic("argument 'ctx' is mandatory")
 	}
@@ -61,16 +61,16 @@ func (c *MergeSubject[TInput, TOutput]) Consume(input <-chan TInput) UnlinkFunc 
 		panic("argument 'input' is mandatory")
 	}
 
-	unregisterFuncs := []func(){}
+	unlinkFuncs := []func(){}
 
 	for _, c := range c.subjects {
-		unregisterFunc := c.Consume(input)
-		unregisterFuncs = append(unregisterFuncs, unregisterFunc)
+		unlinkFunc := c.Consume(input)
+		unlinkFuncs = append(unlinkFuncs, unlinkFunc)
 	}
 
 	return func() {
-		for _, unregisterFunc := range unregisterFuncs {
-			unregisterFunc()
+		for _, unlinkFunc := range unlinkFuncs {
+			unlinkFunc()
 		}
 	}
 }

@@ -5,66 +5,69 @@ import (
 	"sync"
 )
 
-type MergeSubject[TInput, TOutput any] struct {
-	name     string
-	ctx      context.Context
-	subjects []Subject[TInput, TOutput]
+type MergePropagatorBlock[TInput, TOutput any] struct {
+	name        string
+	ctx         context.Context
+	propagators []PropagatorBlock[TInput, TOutput]
 }
 
-var _ Subject[any, any] = &MergeSubject[any, any]{}
+var _ PropagatorBlock[any, any] = &MergePropagatorBlock[any, any]{}
 
-func NewMergeSubjectWithFactory[TInput, TOutput any](ctx context.Context, howMany int, factoryFunc func(i int) Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
+func NewMergePropagatorBlockWithFactory[TInput, TOutput any](ctx context.Context, howMany int, factoryFunc func(i int) PropagatorBlock[TInput, TOutput]) *MergePropagatorBlock[TInput, TOutput] {
 	if ctx == nil {
 		panic("argument 'ctx' is mandatory")
+	}
+	if howMany <= 0 {
+		panic("argument 'howMany' must be positive")
 	}
 	if factoryFunc == nil {
 		panic("argument 'factoryFunc' is mandatory")
 	}
 
-	subjects := make([]Subject[TInput, TOutput], howMany)
+	propagators := make([]PropagatorBlock[TInput, TOutput], howMany)
 
 	for i := 0; i < howMany; i++ {
-		subjects[i] = factoryFunc(i)
+		propagators[i] = factoryFunc(i)
 	}
 
-	return NewMergeSubjectWithInstances(ctx, subjects...)
+	return NewMergePropagatorBlockWithInstances(ctx, propagators...)
 }
 
-func NewMergeSubjectWithInstances[TInput, TOutput any](ctx context.Context, subjects ...Subject[TInput, TOutput]) *MergeSubject[TInput, TOutput] {
+func NewMergePropagatorBlockWithInstances[TInput, TOutput any](ctx context.Context, propagators ...PropagatorBlock[TInput, TOutput]) *MergePropagatorBlock[TInput, TOutput] {
 	if ctx == nil {
 		panic("argument 'ctx' is mandatory")
 	}
-	if subjects == nil {
-		panic("argument 'subject' is mandatory")
+	if propagators == nil {
+		panic("argument 'propagators' is mandatory")
 	}
-	if len(subjects) == 0 {
-		panic("argument 'subjects' must contain at least one element")
+	if len(propagators) == 0 {
+		panic("argument 'propagators' must contain at least one element")
 	}
 
-	return &MergeSubject[TInput, TOutput]{
-		ctx:      ctx,
-		subjects: subjects,
+	return &MergePropagatorBlock[TInput, TOutput]{
+		ctx:         ctx,
+		propagators: propagators,
 	}
 }
 
-func (c *MergeSubject[TInput, TOutput]) GetName() string {
-	return c.name
+func (block *MergePropagatorBlock[TInput, TOutput]) GetName() string {
+	return block.name
 }
 
-func (c *MergeSubject[TInput, TOutput]) SetName(name string) *MergeSubject[TInput, TOutput] {
-	c.name = name
-	return c
+func (block *MergePropagatorBlock[TInput, TOutput]) SetName(name string) *MergePropagatorBlock[TInput, TOutput] {
+	block.name = name
+	return block
 }
 
-func (c *MergeSubject[TInput, TOutput]) Consume(input <-chan TInput) UnlinkFunc {
+func (block *MergePropagatorBlock[TInput, TOutput]) Consume(input <-chan TInput) UnlinkFunc {
 	if input == nil {
 		panic("argument 'input' is mandatory")
 	}
 
 	unlinkFuncs := []func(){}
 
-	for _, c := range c.subjects {
-		unlinkFunc := c.Consume(input)
+	for _, p := range block.propagators {
+		unlinkFunc := p.Consume(input)
 		unlinkFuncs = append(unlinkFuncs, unlinkFunc)
 	}
 
@@ -75,7 +78,7 @@ func (c *MergeSubject[TInput, TOutput]) Consume(input <-chan TInput) UnlinkFunc 
 	}
 }
 
-func (s *MergeSubject[TInput, TOutput]) Produce() <-chan TOutput {
+func (block *MergePropagatorBlock[TInput, TOutput]) Produce() <-chan TOutput {
 	var wg sync.WaitGroup
 	output := make(chan TOutput)
 
@@ -84,16 +87,16 @@ func (s *MergeSubject[TInput, TOutput]) Produce() <-chan TOutput {
 		for n := range c {
 			select {
 			case output <- n:
-			case <-s.ctx.Done():
+			case <-block.ctx.Done():
 				return
 			}
 		}
 	}
 
-	wg.Add(len(s.subjects))
+	wg.Add(len(block.propagators))
 
-	for _, s := range s.subjects {
-		go outputFunc(s.Produce())
+	for _, p := range block.propagators {
+		go outputFunc(p.Produce())
 	}
 
 	go func() {
@@ -104,6 +107,6 @@ func (s *MergeSubject[TInput, TOutput]) Produce() <-chan TOutput {
 	return output
 }
 
-func (s *MergeSubject[TInput, TOutput]) LinkTo(consumer Consumer[TOutput]) UnlinkFunc {
-	return consumer.Consume(s.Produce())
+func (block *MergePropagatorBlock[TInput, TOutput]) LinkTo(target TargetBlock[TOutput]) UnlinkFunc {
+	return target.Consume(block.Produce())
 }

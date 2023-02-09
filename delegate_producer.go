@@ -2,15 +2,15 @@ package pipeline
 
 import "context"
 
-type DelegateProducer[T any] struct {
+type DelegateSourceBlock[T any] struct {
 	name        string
 	ctx         context.Context
 	factoryFunc func() (T, bool)
 }
 
-var _ Producer[any] = &DelegateProducer[any]{}
+var _ SourceBlock[any] = &DelegateSourceBlock[any]{}
 
-func NewDelegateProducer[T any](ctx context.Context, factoryFunc func() (T, bool)) *DelegateProducer[T] {
+func NewDelegateSourceBlock[T any](ctx context.Context, factoryFunc func() (T, bool)) *DelegateSourceBlock[T] {
 	if ctx == nil {
 		panic("argument 'ctx' is mandatory")
 	}
@@ -18,22 +18,22 @@ func NewDelegateProducer[T any](ctx context.Context, factoryFunc func() (T, bool
 		panic("argument 'factoryFunc' is mandatory")
 	}
 
-	return &DelegateProducer[T]{
+	return &DelegateSourceBlock[T]{
 		ctx:         ctx,
 		factoryFunc: factoryFunc,
 	}
 }
 
-func (block *DelegateProducer[T]) GetName() string {
+func (block *DelegateSourceBlock[T]) GetName() string {
 	return block.name
 }
 
-func (block *DelegateProducer[T]) SetName(name string) *DelegateProducer[T] {
+func (block *DelegateSourceBlock[T]) SetName(name string) *DelegateSourceBlock[T] {
 	block.name = name
 	return block
 }
 
-func (block *DelegateProducer[T]) Produce() <-chan T {
+func (block *DelegateSourceBlock[T]) Produce() <-chan T {
 	output := make(chan T)
 
 	go func() {
@@ -54,6 +54,6 @@ func (block *DelegateProducer[T]) Produce() <-chan T {
 	return output
 }
 
-func (block *DelegateProducer[T]) LinkTo(consumer Consumer[T]) UnlinkFunc {
-	return consumer.Consume(block.Produce())
+func (block *DelegateSourceBlock[T]) LinkTo(target TargetBlock[T]) UnlinkFunc {
+	return target.Consume(block.Produce())
 }

@@ -1,25 +1,25 @@
 package pipeline
 
-type DrainConsumer[T any] struct {
+type DrainTargetBlock[T any] struct {
 	name string
 }
 
-var _ Consumer[any] = &DrainConsumer[any]{}
+var _ TargetBlock[any] = &DrainTargetBlock[any]{}
 
-func NewDrainConsumer[T any]() *DrainConsumer[T] {
-	return &DrainConsumer[T]{}
+func NewDrainTargetBlock[T any]() *DrainTargetBlock[T] {
+	return &DrainTargetBlock[T]{}
 }
 
-func (block *DrainConsumer[T]) GetName() string {
+func (block *DrainTargetBlock[T]) GetName() string {
 	return block.name
 }
 
-func (block *DrainConsumer[T]) SetName(name string) *DrainConsumer[T] {
+func (block *DrainTargetBlock[T]) SetName(name string) *DrainTargetBlock[T] {
 	block.name = name
 	return block
 }
 
-func (block *DrainConsumer[T]) Consume(input <-chan T) UnlinkFunc {
+func (block *DrainTargetBlock[T]) Consume(input <-chan T) UnlinkFunc {
 	if input == nil {
 		panic("argument 'input' is mandatory")
 	}

@@ -4,15 +4,15 @@ import (
 	"context"
 )
 
-type ItemsProducer[T any] struct {
+type ItemsSourceBlock[T any] struct {
 	name   string
 	ctx    context.Context
 	values []T
 }
 
-var _ Producer[any] = &ItemsProducer[any]{}
+var _ SourceBlock[any] = &ItemsSourceBlock[any]{}
 
-func NewItemsProducer[T any](ctx context.Context, values []T) *ItemsProducer[T] {
+func NewItemsSourceBlock[T any](ctx context.Context, values []T) *ItemsSourceBlock[T] {
 	if ctx == nil {
 		panic("argument 'ctx' is mandatory")
 	}
@@ -20,22 +20,22 @@ func NewItemsProducer[T any](ctx context.Context, values []T) *ItemsProducer[T] 
 		panic("argument 'values' is mandatory")
 	}
 
-	return &ItemsProducer[T]{
+	return &ItemsSourceBlock[T]{
 		ctx:    ctx,
 		values: values,
 	}
 }
 
-func (block *ItemsProducer[T]) GetName() string {
+func (block *ItemsSourceBlock[T]) GetName() string {
 	return block.name
 }
 
-func (block *ItemsProducer[T]) SetName(name string) *ItemsProducer[T] {
+func (block *ItemsSourceBlock[T]) SetName(name string) *ItemsSourceBlock[T] {
 	block.name = name
 	return block
 }
 
-func (block *ItemsProducer[T]) Produce() <-chan T {
+func (block *ItemsSourceBlock[T]) Produce() <-chan T {
 	output := make(chan T)
 
 	go func() {
@@ -53,6 +53,6 @@ func (block *ItemsProducer[T]) Produce() <-chan T {
 	return output
 }
 
-func (block *ItemsProducer[T]) LinkTo(consumer Consumer[T]) UnlinkFunc {
-	return consumer.Consume(block.Produce())
+func (block *ItemsSourceBlock[T]) LinkTo(target TargetBlock[T]) UnlinkFunc {
+	return target.Consume(block.Produce())
 }

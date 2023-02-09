@@ -4,16 +4,16 @@ import (
 	"context"
 )
 
-type DelegateSubject[TInput, TOutput any] struct {
+type DelegatePropagatorBlock[TInput, TOutput any] struct {
 	name          string
 	ctx           context.Context
 	output        chan TOutput
 	transformFunc func(input TInput) TOutput
 }
 
-var _ Subject[any, any] = &DelegateSubject[any, any]{}
+var _ PropagatorBlock[any, any] = &DelegatePropagatorBlock[any, any]{}
 
-func NewDelegateSubject[TInput, TOutput any](ctx context.Context, transformFunc func(input TInput) TOutput) *DelegateSubject[TInput, TOutput] {
+func NewDelegatePropagatorBlock[TInput, TOutput any](ctx context.Context, transformFunc func(input TInput) TOutput) *DelegatePropagatorBlock[TInput, TOutput] {
 	if ctx == nil {
 		panic("argument 'ctx' is mandatory")
 	}
@@ -21,22 +21,22 @@ func NewDelegateSubject[TInput, TOutput any](ctx context.Context, transformFunc 
 		panic("argument 'transformFunc' is mandatory")
 	}
 
-	return &DelegateSubject[TInput, TOutput]{
+	return &DelegatePropagatorBlock[TInput, TOutput]{
 		ctx:           ctx,
 		transformFunc: transformFunc,
 	}
 }
 
-func (block *DelegateSubject[TInput, TOutput]) GetName() string {
+func (block *DelegatePropagatorBlock[TInput, TOutput]) GetName() string {
 	return block.name
 }
 
-func (block *DelegateSubject[TInput, TOutput]) SetName(name string) *DelegateSubject[TInput, TOutput] {
+func (block *DelegatePropagatorBlock[TInput, TOutput]) SetName(name string) *DelegatePropagatorBlock[TInput, TOutput] {
 	block.name = name
 	return block
 }
 
-func (block *DelegateSubject[TInput, TOutput]) Consume(input <-chan TInput) UnlinkFunc {
+func (block *DelegatePropagatorBlock[TInput, TOutput]) Consume(input <-chan TInput) UnlinkFunc {
 	if input == nil {
 		panic("argument 'input' is mandatory")
 	}
@@ -75,10 +75,10 @@ func (block *DelegateSubject[TInput, TOutput]) Consume(input <-chan TInput) Unli
 	}
 }
 
-func (block *DelegateSubject[TTInput, TOutput]) Produce() <-chan TOutput {
+func (block *DelegatePropagatorBlock[TTInput, TOutput]) Produce() <-chan TOutput {
 	return block.output
 }
 
-func (block *DelegateSubject[TInput, TOutput]) LinkTo(consumer Consumer[TOutput]) UnlinkFunc {
-	return consumer.Consume(block.Produce())
+func (block *DelegatePropagatorBlock[TInput, TOutput]) LinkTo(target TargetBlock[TOutput]) UnlinkFunc {
+	return target.Consume(block.Produce())
 }

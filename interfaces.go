@@ -2,16 +2,16 @@ package pipeline
 
 type UnlinkFunc func()
 
-type Producer[TOutput any] interface {
+type SourceBlock[TOutput any] interface {
 	Produce() <-chan TOutput
-	LinkTo(consumer Consumer[TOutput]) UnlinkFunc
+	LinkTo(target TargetBlock[TOutput]) UnlinkFunc
 }
 
-type Consumer[TInput any] interface {
+type TargetBlock[TInput any] interface {
 	Consume(<-chan TInput) UnlinkFunc
 }
 
-type Subject[TInput, TOutput any] interface {
-	Consumer[TInput]
-	Producer[TOutput]
+type PropagatorBlock[TInput, TOutput any] interface {
+	SourceBlock[TOutput]
+	TargetBlock[TInput]
 }

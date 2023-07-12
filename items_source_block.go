@@ -8,6 +8,7 @@ type ItemsSourceBlock[T any] struct {
 	name   string
 	ctx    context.Context
 	values []T
+	output chan T
 }
 
 var _ SourceBlock[any] = &ItemsSourceBlock[any]{}
@@ -36,21 +37,25 @@ func (block *ItemsSourceBlock[T]) SetName(name string) *ItemsSourceBlock[T] {
 }
 
 func (block *ItemsSourceBlock[T]) Produce() <-chan T {
-	output := make(chan T)
+	if block.output != nil {
+		return block.output
+	}
+
+	block.output = make(chan T)
 
 	go func() {
-		defer close(output)
+		defer close(block.output)
 
 		for _, n := range block.values {
 			select {
-			case output <- n:
+			case block.output <- n:
 			case <-block.ctx.Done():
 				return
 			}
 		}
 	}()
 
-	return output
+	return block.output
 }
 
 func (block *ItemsSourceBlock[T]) LinkTo(target TargetBlock[T]) UnlinkFunc {

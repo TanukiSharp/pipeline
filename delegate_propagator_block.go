@@ -2,11 +2,16 @@ package pipeline
 
 import (
 	"context"
+	"sync"
 )
 
+NEED TO AVOID CLEAN FAN-IN AND FAN-OUT FUNCTIONS, AND USE THEM TO IMPLEMENT BLOCKS
+
 type DelegatePropagatorBlock[TInput, TOutput any] struct {
+	sync.Mutex
 	name          string
 	ctx           context.Context
+	inputs        inputsSet[TInput, TOutput]
 	output        chan TOutput
 	transformFunc func(input TInput) TOutput
 }
@@ -41,38 +46,13 @@ func (block *DelegatePropagatorBlock[TInput, TOutput]) Consume(input <-chan TInp
 		panic("argument 'input' is mandatory")
 	}
 
-	linkContext, unlink := context.WithCancel(context.Background())
+	unlink, isNew := block.inputs.set(input)
 
-	block.output = make(chan TOutput)
-
-	go func() {
-		defer close(block.output)
-
-		for {
-			select {
-			case n, ok := <-input:
-				if ok == false {
-					return
-				}
-
-				select {
-				case block.output <- block.transformFunc(n):
-				case <-block.ctx.Done():
-					return
-				case <-linkContext.Done():
-					return
-				}
-			case <-block.ctx.Done():
-				return
-			case <-linkContext.Done():
-				return
-			}
-		}
-	}()
-
-	return func() {
-		unlink()
+	if isNew == false {
+		block.consumeCore()
 	}
+
+	return unlink
 }
 
 func (block *DelegatePropagatorBlock[TTInput, TOutput]) Produce() <-chan TOutput {

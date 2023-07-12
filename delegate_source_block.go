@@ -6,6 +6,7 @@ type DelegateSourceBlock[T any] struct {
 	name        string
 	ctx         context.Context
 	factoryFunc func() (T, bool)
+	output      chan T
 }
 
 var _ SourceBlock[any] = &DelegateSourceBlock[any]{}
@@ -34,24 +35,28 @@ func (block *DelegateSourceBlock[T]) SetName(name string) *DelegateSourceBlock[T
 }
 
 func (block *DelegateSourceBlock[T]) Produce() <-chan T {
-	output := make(chan T)
+	if block.output != nil {
+		return block.output
+	}
+
+	block.output = make(chan T)
 
 	go func() {
-		defer close(output)
+		defer close(block.output)
 		for {
 			item, hasItem := block.factoryFunc()
 			if hasItem == false {
 				break
 			}
 			select {
-			case output <- item:
+			case block.output <- item:
 			case <-block.ctx.Done():
 				return
 			}
 		}
 	}()
 
-	return output
+	return block.output
 }
 
 func (block *DelegateSourceBlock[T]) LinkTo(target TargetBlock[T]) UnlinkFunc {

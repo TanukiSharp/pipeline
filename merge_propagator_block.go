@@ -9,6 +9,7 @@ type MergePropagatorBlock[TInput, TOutput any] struct {
 	name        string
 	ctx         context.Context
 	propagators []PropagatorBlock[TInput, TOutput]
+	output      chan TOutput
 }
 
 var _ PropagatorBlock[any, any] = &MergePropagatorBlock[any, any]{}
@@ -79,14 +80,19 @@ func (block *MergePropagatorBlock[TInput, TOutput]) Consume(input <-chan TInput)
 }
 
 func (block *MergePropagatorBlock[TInput, TOutput]) Produce() <-chan TOutput {
+	if block.output != nil {
+		return block.output
+	}
+
+	block.output = make(chan TOutput)
+
 	var wg sync.WaitGroup
-	output := make(chan TOutput)
 
 	outputFunc := func(c <-chan TOutput) {
 		defer wg.Done()
 		for n := range c {
 			select {
-			case output <- n:
+			case block.output <- n:
 			case <-block.ctx.Done():
 				return
 			}
@@ -101,10 +107,10 @@ func (block *MergePropagatorBlock[TInput, TOutput]) Produce() <-chan TOutput {
 
 	go func() {
 		wg.Wait()
-		close(output)
+		close(block.output)
 	}()
 
-	return output
+	return block.output
 }
 
 func (block *MergePropagatorBlock[TInput, TOutput]) LinkTo(target TargetBlock[TOutput]) UnlinkFunc {
